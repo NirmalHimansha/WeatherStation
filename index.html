@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AtmoStation — Wattala Weather</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;900&family=DM+Mono:ital,wght@0,300;0,400;0,500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:          #060b14;
+    --bg2:         #0a1020;
+    --card:        #0c1628;
+    --card2:       #0f1c35;
+    --border:      #1a2d50;
+    --cyan:        #00e5ff;
+    --cyan-dim:    rgba(0,229,255,0.13);
+    --cyan-faint:  rgba(0,229,255,0.04);
+    --amber:       #ffab00;
+    --amber-dim:   rgba(255,171,0,0.13);
+    --amber-faint: rgba(255,171,0,0.04);
+    --green:       #00e676;
+    --red:         #ff3d57;
+    --purple:      #b388ff;
+    --text:        #d0e8ff;
+    --muted:       #4a6a9a;
+    --muted2:      #2a4470;
+    --font-head:   'Orbitron', monospace;
+    --font-mono:   'DM Mono', monospace;
+    --font-body:   'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px,
+      rgba(0,0,0,0.022) 2px, rgba(0,0,0,0.022) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(180deg, #07101f 0%, rgba(6,11,20,0.96) 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 66px;
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(14px);
+  }
+
+  .logo { display: flex; align-items: center; gap: 13px; }
+
+  .logo-icon {
+    width: 40px; height: 40px;
+    border: 2px solid var(--cyan); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 16px rgba(0,229,255,0.35);
+    animation: glowPulse 3.5s ease-in-out infinite;
+  }
+  @keyframes glowPulse {
+    0%,100% { box-shadow: 0 0 14px rgba(0,229,255,0.3); }
+    50%      { box-shadow: 0 0 30px rgba(0,229,255,0.65); }
+  }
+
+  .logo-name {
+    font-family: var(--font-head);
+    font-size: 16px; font-weight: 900;
+    letter-spacing: 4px; color: var(--text);
+  }
+  .logo-name span { color: var(--cyan); }
+  .logo-sub {
+    font-family: var(--font-mono);
+    font-size: 9px; letter-spacing: 2px;
+    color: var(--muted); margin-top: 3px;
+  }
+
+  .hdr-right { display: flex; align-items: center; gap: 16px; }
+
+  .pill {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 12px;
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 20px;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--muted);
+    transition: background .3s, box-shadow .3s;
+  }
+  .dot.ok   { background: var(--green); box-shadow: 0 0 7px var(--green); }
+  .dot.warn { background: var(--amber); box-shadow: 0 0 7px var(--amber); }
+  .dot.err  { background: var(--red);   box-shadow: 0 0 7px var(--red); animation: blinkDot 1s infinite; }
+  @keyframes blinkDot { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .sync-txt { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+
+  .btn-ref {
+    background: var(--cyan-dim); border: 1px solid var(--cyan);
+    color: var(--cyan); padding: 7px 18px; border-radius: 8px;
+    cursor: pointer; font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 1px;
+    transition: background .2s;
+  }
+  .btn-ref:hover { background: rgba(0,229,255,0.22); }
+  .btn-ref:disabled { opacity: .5; pointer-events: none; }
+
+  /* ── ERROR ── */
+  .err-bar {
+    display: none; align-items: center; gap: 10px;
+    margin: 14px 28px 0;
+    padding: 11px 18px;
+    background: rgba(255,61,87,0.07);
+    border: 1px solid rgba(255,61,87,0.22);
+    border-radius: 9px;
+    font-family: var(--font-mono); font-size: 11px; color: #ff7b8a;
+  }
+
+  /* ── MAIN ── */
+  main {
+    padding: 22px 28px;
+    display: flex; flex-direction: column; gap: 22px;
+    max-width: 1600px; margin: 0 auto;
+  }
+
+  .sec-lbl {
+    font-family: var(--font-head);
+    font-size: 9px; letter-spacing: 3.5px;
+    color: var(--muted); text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .sec-lbl::after { content:''; flex:1; height:1px; background: var(--border); }
+
+  /* ── METRICS ── */
+  .metrics-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+
+  .mc {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 22px 24px 18px;
+    position: relative; overflow: hidden;
+  }
+  .mc.temp     { border-top: 2px solid var(--cyan); }
+  .mc.pressure { border-top: 2px solid var(--amber); }
+  .mc.light    { border-top: 2px solid var(--purple); }
+  .mc::after {
+    content:''; position:absolute;
+    bottom:-55px; right:-55px;
+    width:140px; height:140px;
+    border-radius:50%; opacity:.05;
+  }
+  .mc.temp::after     { background:var(--cyan); }
+  .mc.pressure::after { background:var(--amber); }
+  .mc.light::after    { background:var(--purple); }
+
+  .ml {
+    font-family: var(--font-mono);
+    font-size: 9px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .mv {
+    font-family: var(--font-mono);
+    font-size: 48px; font-weight: 500;
+    letter-spacing: -1.5px; line-height: 1;
+    margin-bottom: 8px;
+  }
+  .mc.temp     .mv { color: var(--cyan); }
+  .mc.pressure .mv { color: var(--amber); }
+  .mc.light    .mv { color: var(--purple); }
+  .mu { font-size: 18px; font-weight: 300; opacity: .6; }
+
+  .msub {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--muted); min-height: 18px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tu  { color: var(--red); }
+  .td  { color: var(--cyan); }
+  .ts  { color: var(--green); }
+
+  .spark { height: 44px; margin-top: 14px; }
+
+  @keyframes flash { from{opacity:.3} to{opacity:1} }
+  .flash { animation: flash .5s ease-out; }
+
+  /* ── CHART CARD ── */
+  .chart-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .chart-head {
+    padding: 13px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    padding: 6px 15px; border-radius: 7px;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px;
+    cursor: pointer; background: transparent;
+    border: 1px solid transparent; color: var(--muted);
+    transition: all .2s;
+  }
+  .tab:hover { color: var(--text); border-color: var(--border); }
+  .tab.active { background: var(--cyan-dim); border-color: var(--cyan); color: var(--cyan); }
+  .tab.amber.active { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+  .chart-body { padding: 20px; }
+
+  .no-data {
+    text-align: center; padding: 50px 20px;
+    font-family: var(--font-mono); font-size: 12px;
+    color: var(--muted); letter-spacing: 1px;
+  }
+  .no-data span { display:block; font-size:34px; margin-bottom:12px; }
+
+  /* ── BOTTOM GRID ── */
+  .btm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .info-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .ic-head {
+    padding: 13px 20px; border-bottom: 1px solid var(--border);
+    font-family: var(--font-head); font-size: 9px;
+    letter-spacing: 3px; color: var(--muted); text-transform: uppercase;
+  }
+  .ic-body { padding: 18px 20px; }
+
+  /* ── PREDICTION ── */
+  .pred-top { display:flex; align-items:flex-start; gap:14px; margin-bottom:18px; }
+  .pred-ico {
+    width: 58px; height: 58px; flex-shrink: 0;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+  }
+  .pred-ico.fair   { background:rgba(0,230,118,.1); border:1px solid rgba(0,230,118,.25); }
+  .pred-ico.cloudy { background:rgba(255,171,0,.1);  border:1px solid rgba(255,171,0,.25); }
+  .pred-ico.rain   { background:rgba(0,229,255,.1);  border:1px solid rgba(0,229,255,.25); }
+  .pred-ico.storm  { background:rgba(255,61,87,.1);  border:1px solid rgba(255,61,87,.25); }
+  .pred-ico.idle   { background:var(--card2);         border:1px solid var(--border); }
+
+  .pred-text h3 {
+    font-family: var(--font-head); font-size: 13px;
+    letter-spacing: 1px; margin-bottom: 6px; line-height: 1.3;
+  }
+  .pred-text p { font-size: 12px; color: var(--muted); line-height: 1.65; }
+
+  .tbar { display:flex; align-items:center; gap:10px; margin-bottom:9px; }
+  .tbl  { font-family:var(--font-mono); font-size:9px; color:var(--muted); width:74px; flex-shrink:0; letter-spacing:1px; }
+  .tbt  { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .tbf  { height:100%; border-radius:2px; transition: width .9s ease; }
+  .tbv  { font-family:var(--font-mono); font-size:10px; width:72px; text-align:right; flex-shrink:0; }
+
+  .owm-stats {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    gap: 8px; margin-top: 16px;
+    background: var(--amber-faint);
+    border: 1px solid rgba(255,171,0,.12);
+    border-radius: 10px; padding: 12px;
+  }
+  .owm-stat { text-align:center; }
+  .osv { display:block; font-family:var(--font-mono); font-size:15px; color:var(--amber); }
+  .osl { display:block; font-family:var(--font-mono); font-size:8px; letter-spacing:1px; color:var(--muted); text-transform:uppercase; margin-top:3px; }
+
+  /* ── COMPARISON ── */
+  .comp-body {
+    display: grid; grid-template-columns: 1fr 28px 1fr;
+    gap: 8px; align-items: center;
+  }
+  .comp-src { font-family:var(--font-mono); font-size:9px; letter-spacing:1.5px; text-transform:uppercase; margin-bottom:12px; }
+  .comp-src.s { color:var(--cyan); }
+  .comp-src.o { color:var(--amber); }
+  .comp-row { display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(26,45,80,.6); }
+  .comp-row:last-child { border-bottom:none; }
+  .crl { font-family:var(--font-mono); font-size:10px; color:var(--muted); }
+  .crv { font-family:var(--font-mono); font-size:13px; }
+  .comp-vs { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .cvl { width:1px; height:40px; background:var(--border); }
+  .cvs { font-family:var(--font-mono); font-size:8px; letter-spacing:1px; color:var(--muted2); }
+
+  /* ── FORECAST ── */
+  .fc-strip { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }
+  .fc-item {
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 8px; text-align: center;
+    transition: border-color .2s, background .2s; cursor: default;
+  }
+  .fc-item:hover { border-color:var(--amber); background:var(--amber-faint); }
+  .fc-day  { font-family:var(--font-mono); font-size:9px; letter-spacing:1px; color:var(--muted); text-transform:uppercase; margin-bottom:8px; }
+  .fc-ico  { font-size:26px; margin-bottom:8px; }
+  .fc-hi   { font-family:var(--font-mono); font-size:14px; color:var(--amber); }
+  .fc-lo   { font-family:var(--font-mono); font-size:14px; color:var(--muted); }
+  .fc-rain { font-family:var(--font-mono); font-size:9px; color:var(--cyan); margin-top:5px; }
+  .fc-desc { font-size:9px; color:var(--muted); margin-top:3px; line-height:1.3; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width:1050px) {
+    .metrics-row { grid-template-columns:1fr 1fr; }
+    .btm-grid    { grid-template-columns:1fr; }
+    .fc-strip    { grid-template-columns:repeat(3,1fr); }
+  }
+  @media (max-width:640px) {
+    header { padding:0 14px; }
+    main   { padding:14px; gap:14px; }
+    .metrics-row { grid-template-columns:1fr; }
+    .mv    { font-size:38px; }
+    .fc-strip { grid-template-columns:repeat(2,1fr); }
+    .comp-body { grid-template-columns:1fr; }
+    .comp-vs   { display:none; }
+    .logo-sub  { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-name">ATMO<span>STATION</span></div>
+      <div class="logo-sub">WATTALA, SRI LANKA &nbsp;·&nbsp; ESP8266 / BMP280</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="pill"><span class="dot" id="dotSheet"></span>SHEET</div>
+    <div class="pill"><span class="dot" id="dotOwm"></span>OWM</div>
+    <div class="sync-txt" id="syncTxt">—</div>
+    <button class="btn-ref" id="btnRef" onclick="refreshAll()">↻ REFRESH</button>
+  </div>
+</header>
+
+<div class="err-bar" id="errBar">⚠ <span id="errTxt"></span></div>
+
+<main>
+
+  <!-- LIVE -->
+  <div>
+    <div class="sec-lbl">◈ Live Sensor Readings</div>
+    <div class="metrics-row">
+      <div class="mc temp">
+        <div class="ml">🌡 &nbsp;Temperature</div>
+        <div class="mv" id="vTemp">—<span class="mu"> °C</span></div>
+        <div class="msub" id="subTemp">&nbsp;</div>
+        <div class="spark"><canvas id="spTemp"></canvas></div>
+      </div>
+      <div class="mc pressure">
+        <div class="ml">🌬 &nbsp;Pressure</div>
+        <div class="mv" id="vPres">—<span class="mu"> hPa</span></div>
+        <div class="msub" id="subPres">&nbsp;</div>
+        <div class="spark"><canvas id="spPres"></canvas></div>
+      </div>
+      <div class="mc light">
+        <div class="ml">☀ &nbsp;Light Level</div>
+        <div class="mv" id="vLight">—<span class="mu"> ADC</span></div>
+        <div class="msub" id="subLight">&nbsp;</div>
+        <div class="spark"><canvas id="spLight"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div>
+    <div class="sec-lbl">◈ Sensor History</div>
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="tabs" id="cTabs">
+          <button class="tab active"  data-c="temp"    onclick="setChart(this)">Temperature</button>
+          <button class="tab amber"   data-c="pres"    onclick="setChart(this)">Pressure</button>
+          <button class="tab"         data-c="light"   onclick="setChart(this)">Light</button>
+          <button class="tab"         data-c="compare" onclick="setChart(this)">Sensor vs OWM</button>
+        </div>
+        <div class="tabs" id="tTabs">
+          <button class="tab active" data-t="6h"  onclick="setTime(this)">6 H</button>
+          <button class="tab"        data-t="24h" onclick="setTime(this)">24 H</button>
+          <button class="tab"        data-t="7d"  onclick="setTime(this)">7 D</button>
+          <button class="tab"        data-t="all" onclick="setTime(this)">ALL</button>
+        </div>
+      </div>
+      <div class="chart-body">
+        <canvas id="mainChart" height="290" style="display:none"></canvas>
+        <div id="chartMsg" class="no-data"><span>📊</span>Loading sensor data…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM -->
+  <div class="btm-grid">
+
+    <div class="info-card">
+      <div class="ic-head">◈ Weather Prediction — Pressure Analysis</div>
+      <div class="ic-body">
+        <div class="pred-top">
+          <div class="pred-ico idle" id="predIco">🌤</div>
+          <div class="pred-text">
+            <h3 id="predTitle">Awaiting data…</h3>
+            <p  id="predDesc">Pressure trend will be calculated once sensor readings are loaded.</p>
+          </div>
+        </div>
+        <div id="trendBars"></div>
+        <div id="owmXtra" style="display:none">
+          <div style="font-family:var(--font-mono);font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-top:4px">OWM CURRENT CONDITIONS</div>
+          <div class="owm-stats" id="owmGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <div class="ic-head">◈ Sensor vs OpenWeatherMap</div>
+      <div class="ic-body">
+        <div class="comp-body">
+          <div>
+            <div class="comp-src s">⚡ ESP8266 Sensor</div>
+            <div class="comp-row"><span class="crl">Temp</span>     <span class="crv" id="cST" style="color:var(--cyan)">—</span></div>
+            <div class="comp-row"><span class="crl">Pressure</span> <span class="crv" id="cSP" style="color:var(--cyan)">—</span></div>
+            <div class="comp-row"><span class="crl">Light</span>    <span class="crv" id="cSL" style="color:var(--cyan)">—</span></div>
+            <div class="comp-row"><span class="crl">Updated</span>  <span class="crv" id="cSU" style="color:var(--muted);font-size:10px">—</span></div>
+          </div>
+          <div class="comp-vs">
+            <div class="cvl"></div><span class="cvs">VS</span><div class="cvl"></div>
+          </div>
+          <div>
+            <div class="comp-src o">🌐 OpenWeatherMap</div>
+            <div class="comp-row"><span class="crl">Temp</span>      <span class="crv" id="cOT" style="color:var(--amber)">—</span></div>
+            <div class="comp-row"><span class="crl">Pressure</span>  <span class="crv" id="cOP" style="color:var(--amber)">—</span></div>
+            <div class="comp-row"><span class="crl">Humidity</span>  <span class="crv" id="cOH" style="color:var(--amber)">—</span></div>
+            <div class="comp-row"><span class="crl">Condition</span> <span class="crv" id="cOC" style="color:var(--amber);font-size:10px">—</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FORECAST -->
+  <div>
+    <div class="sec-lbl">◈ 5-Day OWM Forecast</div>
+    <div class="info-card">
+      <div class="ic-head" id="fcHead">Loading forecast…</div>
+      <div class="ic-body">
+        <div class="fc-strip" id="fcStrip">
+          <div class="no-data" style="grid-column:1/-1"><span>🌤</span>Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ══════════════════════════════════════════════════
+//  CREDENTIALS (hardcoded)
+// ══════════════════════════════════════════════════
+const SHEET_ID   = '15TiNEPdAQ_VdeEafpXdSHkX9zsHlwE3LRA5eK0Mf9b8';
+const SHEET_TAB  = 'Sheet1';
+const OWM_KEY    = 'd9002d924b8eced8c5a518606f4caf4c';
+const OWM_CITY   = 'Wattala,LK';
+
+// Column positions (0-based) — matches your Arduino JSON field order
+const COL_TS   = 0;
+const COL_TEMP = 1;
+const COL_PRES = 2;
+const COL_LGHT = 3;
+
+const AUTO_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
+
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+let rows = [];
+let owmCur  = null;
+let owmFc   = null;
+let mainCh  = null;
+let sparks  = {};
+let activeC = 'temp';
+let activeT = '6h';
+
+// ══════════════════════════════════════════════════
+//  FETCH
+// ══════════════════════════════════════════════════
+function fetchSheet() {
+  return new Promise((resolve) => {
+    // JSONP via script-tag — works from file:// with zero CORS issues
+    const cb = 'gviz_' + Date.now();
+
+    const script = document.createElement('script');
+    script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&sheet=${encodeURIComponent(SHEET_TAB)}`;
+
+    const cleanup = () => {
+      delete window[cb];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      dot('dotSheet', 'err');
+      showErr('Sheet request timed out. Check your internet connection.');
+      resolve(false);
+    }, 12000);
+
+    window[cb] = (resp) => {
+      clearTimeout(timer);
+      cleanup();
+      try {
+        if (!resp || resp.status !== 'ok')
+          throw new Error(resp?.errors?.[0]?.message || 'Bad response from sheet');
+
+        const table = resp.table;
+        if (!table || !table.rows || table.rows.length === 0)
+          throw new Error('Sheet is empty or not publicly shared.');
+
+        rows = [];
+        for (const row of table.rows) {
+          if (!row || !row.c) continue;
+          const c = row.c;
+
+          // gviz returns formatted string in .f and raw value in .v
+          const tsRaw = (c[COL_TS]?.f ?? c[COL_TS]?.v ?? '').toString();
+          const ts   = parseTS(tsRaw);
+          const temp = parseFloat(c[COL_TEMP]?.v);
+          const pres = parseFloat(c[COL_PRES]?.v);
+          const lght = parseFloat(c[COL_LGHT]?.v);
+
+          if (!ts || isNaN(temp) || isNaN(pres)) continue;
+          rows.push({ ts, temp, pres, lght: isNaN(lght) ? 0 : lght });
+        }
+
+        rows.sort((a, b) => a.ts - b.ts);
+        dot('dotSheet', 'ok');
+        resolve(true);
+      } catch (e) {
+        dot('dotSheet', 'err');
+        showErr('Sheet error: ' + e.message);
+        resolve(false);
+      }
+    };
+
+    script.onerror = () => {
+      clearTimeout(timer);
+      cleanup();
+      dot('dotSheet', 'err');
+      showErr('Cannot reach Google Sheet. Check sharing settings: "Anyone with the link → Viewer".');
+      resolve(false);
+    };
+
+    document.head.appendChild(script);
+  });
+}
+
+async function fetchOWM() {
+  try {
+    const [rC, rF] = await Promise.all([
+      fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(OWM_CITY)}&appid=${OWM_KEY}&units=metric`),
+      fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(OWM_CITY)}&appid=${OWM_KEY}&units=metric`)
+    ]);
+    if (!rC.ok) { const j = await rC.json(); throw new Error(j.message || 'OWM error'); }
+    owmCur = await rC.json();
+    owmFc  = rF.ok ? await rF.json() : null;
+    dot('dotOwm', 'ok');
+    return true;
+  } catch (e) {
+    dot('dotOwm', 'err');
+    console.warn('OWM fetch failed:', e.message);
+    return false;
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  DATE PARSER
+// ══════════════════════════════════════════════════
+function parseTS(s) {
+  if (!s) return null;
+  s = s.replace(/^"|"$/g, '').trim();
+
+  // Raw millis from ESP (NTP not available) — 13-digit unix ms or large number
+  if (/^\d+$/.test(s)) {
+    const n = parseInt(s);
+    // Only trust if it resolves to a plausible year (2020–2035)
+    const d = new Date(n);
+    if (d.getFullYear() >= 2020 && d.getFullYear() <= 2035) return d;
+    return null; // junk uptime millis — discard
+  }
+
+  // DD/MM/YYYY HH:MM:SS  (Google Sheets locale — Sri Lanka / UK style)
+  const ddmm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})[,\s]+(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (ddmm) {
+    const [, dd, mm, yyyy, hh, min, sec] = ddmm;
+    const d = new Date(+yyyy, +mm - 1, +dd, +hh, +min, +sec);
+    return isNaN(d) ? null : d;
+  }
+
+  // DD/MM/YYYY  (date only)
+  const ddmmOnly = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmOnly) {
+    const [, dd, mm, yyyy] = ddmmOnly;
+    const d = new Date(+yyyy, +mm - 1, +dd);
+    return isNaN(d) ? null : d;
+  }
+
+  // ISO 8601 / YYYY-MM-DD HH:MM:SS
+  const iso = new Date(s.replace('T', ' '));
+  if (!isNaN(iso) && iso.getFullYear() >= 2020) return iso;
+
+  return null;
+}
+
+// ══════════════════════════════════════════════════
+//  RENDER — LIVE METRICS
+// ══════════════════════════════════════════════════
+function renderLive() {
+  if (!rows.length) return;
+  const lat = rows[rows.length - 1];
+  const prv = rows.length > 1 ? rows[rows.length - 2] : null;
+
+  setVal('vTemp',  lat.temp.toFixed(1), '°C');
+  setVal('vPres',  lat.pres.toFixed(1), 'hPa');
+  setVal('vLight', lat.lght,            'ADC');
+
+  if (prv) {
+    document.getElementById('subTemp').innerHTML  = tTag(lat.temp - prv.temp, 1,   '°')   + ' &nbsp; ' + age(lat.ts);
+    document.getElementById('subPres').innerHTML  = tTag(lat.pres - prv.pres, 0.5, ' hPa') + ' &nbsp; ' + age(lat.ts);
+    document.getElementById('subLight').innerHTML = tTag(lat.lght - prv.lght, 5,   '')    + ' &nbsp; ' + age(lat.ts);
+  } else {
+    ['subTemp','subPres','subLight'].forEach(id =>
+      document.getElementById(id).textContent = age(lat.ts));
+  }
+
+  // Comparison — sensor side
+  document.getElementById('cST').textContent = lat.temp.toFixed(1) + ' °C';
+  document.getElementById('cSP').textContent = lat.pres.toFixed(1) + ' hPa';
+  document.getElementById('cSL').textContent = lat.lght + ' / 1023';
+  document.getElementById('cSU').textContent = age(lat.ts);
+}
+
+function setVal(id, v, u) {
+  const el = document.getElementById(id);
+  el.innerHTML = `${v}<span class="mu"> ${u}</span>`;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}
+
+function tTag(d, thr, u) {
+  if (d >  thr) return `<span class="tu">▲ +${d.toFixed(1)}${u}</span>`;
+  if (d < -thr) return `<span class="td">▼ ${d.toFixed(1)}${u}</span>`;
+  return `<span class="ts">━ stable</span>`;
+}
+
+function age(d) {
+  const s = Math.floor((Date.now() - d) / 1000);
+  if (s < 60)    return s + 's ago';
+  if (s < 3600)  return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+
+// ══════════════════════════════════════════════════
+//  RENDER — SPARKLINES
+// ══════════════════════════════════════════════════
+function renderSparks() {
+  if (!rows.length) return;
+  const slice = rows.slice(-24);
+  const lbls  = slice.map(() => '');
+
+  function mk(id, data, color) {
+    if (sparks[id]) sparks[id].destroy();
+    const ctx = document.getElementById(id).getContext('2d');
+    const bg  = color.replace(')', ', 0.07)').replace('rgb', 'rgba');
+    sparks[id] = new Chart(ctx, {
+      type: 'line',
+      data: { labels: lbls, datasets: [{ data, borderColor: color, backgroundColor: bg,
+          borderWidth: 1.5, pointRadius: 0, fill: true, tension: 0.4 }] },
+      options: { responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: { x: { display: false }, y: { display: false } } }
+    });
+  }
+
+  mk('spTemp',  slice.map(r => r.temp),  'rgb(0,229,255)');
+  mk('spPres',  slice.map(r => r.pres),  'rgb(255,171,0)');
+  mk('spLight', slice.map(r => r.lght),  'rgb(179,136,255)');
+}
+
+// ══════════════════════════════════════════════════
+//  RENDER — MAIN CHART
+// ══════════════════════════════════════════════════
+function getFiltered() {
+  if (!rows.length) return [];
+  const now = Date.now();
+  const lim = { '6h': 6*3600e3, '24h': 24*3600e3, '7d': 7*86400e3, 'all': Infinity }[activeT] || Infinity;
+  return rows.filter(r => now - r.ts <= lim);
+}
+
+function renderMainChart() {
+  const data   = getFiltered();
+  const canvas = document.getElementById('mainChart');
+  const msg    = document.getElementById('chartMsg');
+
+  if (!data.length) {
+    canvas.style.display = 'none';
+    msg.style.display    = 'block';
+    msg.innerHTML = rows.length === 0
+      ? '<span>📊</span>Loading sensor data…'
+      : '<span>📊</span>No data in this time range';
+    if (mainCh) { mainCh.destroy(); mainCh = null; }
+    return;
+  }
+
+  canvas.style.display = 'block';
+  msg.style.display    = 'none';
+
+  const isDayView = activeT === '7d' || activeT === 'all';
+  const labels = data.map(r =>
+    isDayView
+      ? r.ts.toLocaleDateString([], { month: 'short', day: 'numeric' })
+      : r.ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  );
+
+  const pts = data.length > 60 ? 0 : 2;
+  let datasets = [];
+
+  switch (activeC) {
+    case 'temp':
+      datasets = [{ label: 'Sensor Temp (°C)', data: data.map(r => r.temp),
+        borderColor: '#00e5ff', backgroundColor: 'rgba(0,229,255,0.05)',
+        borderWidth: 2, pointRadius: pts, fill: true, tension: 0.4 }];
+      break;
+    case 'pres':
+      datasets = [{ label: 'Pressure (hPa)', data: data.map(r => r.pres),
+        borderColor: '#ffab00', backgroundColor: 'rgba(255,171,0,0.05)',
+        borderWidth: 2, pointRadius: pts, fill: true, tension: 0.4 }];
+      break;
+    case 'light':
+      datasets = [{ label: 'Light ADC', data: data.map(r => r.lght),
+        borderColor: '#b388ff', backgroundColor: 'rgba(179,136,255,0.05)',
+        borderWidth: 2, pointRadius: pts, fill: true, tension: 0.4 }];
+      break;
+    case 'compare':
+    default:
+      datasets = [
+        { label: 'Sensor Temp (°C)', data: data.map(r => r.temp),
+          borderColor: '#00e5ff', backgroundColor: 'rgba(0,229,255,0.05)',
+          borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4, yAxisID: 'y' },
+        { label: 'Sensor Pressure (hPa)', data: data.map(r => r.pres),
+          borderColor: 'rgba(255,171,0,0.65)', borderDash: [5, 4],
+          borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0.4, yAxisID: 'y1' }
+      ];
+      // Overlay OWM forecast temps if available
+      if (owmFc) {
+        const s = data[0].ts.getTime();
+        const e = data[data.length - 1].ts.getTime();
+        const fc = owmFc.list.filter(f => f.dt*1000 >= s - 3*3600e3 && f.dt*1000 <= e + 6*3600e3).slice(0, 16);
+        if (fc.length) {
+          datasets.push({
+            label: 'OWM Forecast Temp',
+            data: fc.map(f => f.main.temp),
+            labels: fc.map(f => new Date(f.dt*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})),
+            borderColor: 'rgba(255,200,0,0.5)',
+            backgroundColor: 'transparent',
+            borderWidth: 1.5, pointRadius: 3, pointStyle: 'circle',
+            fill: false, tension: 0.4, yAxisID: 'y', showLine: true
+          });
+        }
+      }
+  }
+
+  const scales = {
+    x: { ticks: { color:'#2a4470', font:{family:"'DM Mono'",size:9}, maxTicksLimit:10, maxRotation:0 },
+         grid: { color:'rgba(26,45,80,0.5)' }, border: { color:'#1a2d50' } },
+    y: { ticks: { color:'#4a6a9a', font:{family:"'DM Mono'",size:10} },
+         grid: { color:'rgba(26,45,80,0.4)' }, border: { color:'#1a2d50' } }
+  };
+
+  if (activeC === 'compare') {
+    scales.y1 = {
+      position: 'right',
+      ticks: { color:'rgba(255,171,0,0.45)', font:{family:"'DM Mono'",size:10} },
+      grid: { drawOnChartArea: false }, border: { color:'#1a2d50' }
+    };
+  }
+
+  if (mainCh) mainCh.destroy();
+  mainCh = new Chart(document.getElementById('mainChart').getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: { duration: 380 },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: datasets.length > 1,
+          labels: { color:'#4a6a9a', font:{family:"'DM Mono'",size:10}, boxWidth:18, padding:14 } },
+        tooltip: {
+          backgroundColor:'#0c1628', borderColor:'#1a2d50', borderWidth:1,
+          titleColor:'#4a6a9a', bodyColor:'#d0e8ff',
+          titleFont:{family:"'DM Mono'",size:10}, bodyFont:{family:"'DM Mono'",size:12},
+          padding:10
+        }
+      },
+      scales
+    }
+  });
+}
+
+function setChart(btn) {
+  activeC = btn.dataset.c;
+  document.querySelectorAll('#cTabs .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderMainChart();
+}
+
+function setTime(btn) {
+  activeT = btn.dataset.t;
+  document.querySelectorAll('#tTabs .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderMainChart();
+}
+
+// ══════════════════════════════════════════════════
+//  RENDER — COMPARISON
+// ══════════════════════════════════════════════════
+function renderComparison() {
+  if (!owmCur) return;
+  document.getElementById('cOT').textContent = owmCur.main.temp.toFixed(1) + ' °C';
+  document.getElementById('cOP').textContent = owmCur.main.pressure + ' hPa';
+  document.getElementById('cOH').textContent = owmCur.main.humidity + ' %';
+  document.getElementById('cOC').textContent = (owmCur.weather[0]?.description || '—').toUpperCase();
+}
+
+// ══════════════════════════════════════════════════
+//  RENDER — PREDICTION
+// ══════════════════════════════════════════════════
+function renderPrediction() {
+  if (rows.length < 3) return;
+
+  const recent = rows.slice(-12);
+  const p0 = recent[0].pres;
+  const p1 = recent[recent.length - 1].pres;
+  const pm = recent[Math.floor(recent.length / 2)].pres;
+  const d3 = p1 - p0;   // 3-hour trend proxy
+  const d1 = p1 - pm;   // 1-hour trend proxy
+
+  let title, desc, icon, cls;
+  if      (d3 >  3.0) { cls='fair';   icon='🌤'; title='CLEARING — FAIR WEATHER';      desc='Rapid pressure rise signals a high-pressure system moving in. Expect clearing skies and dry conditions over the next 12–24 hours.'; }
+  else if (d3 >  1.0) { cls='fair';   icon='⛅'; title='IMPROVING CONDITIONS';          desc='Gradual pressure rise indicates improving weather. Clouds likely to decrease and conditions to stabilise soon.'; }
+  else if (d3 >= -1.0 && p1 > 1013)
+                       { cls='fair';   icon='☀'; title='STABLE — HIGH PRESSURE';        desc='Steady high pressure. Continued fair, settled weather expected. Coastal areas may see light morning mist.'; }
+  else if (d3 >= -1.0) { cls='cloudy'; icon='🌥'; title='STABLE — OVERCAST';            desc='Pressure stable but below normal. Overcast skies or light drizzle may persist. No major change imminent.'; }
+  else if (d3 >  -3.0) { cls='rain';   icon='🌦'; title='DETERIORATING';                desc='Falling pressure signals an approaching weather system. Rain and increasing cloud cover likely within 6–12 hours.'; }
+  else                 { cls='storm';  icon='⛈'; title='STORM WARNING — LOW PRESSURE'; desc='Rapid pressure drop indicates a strong system incoming. Heavy rain, gusty winds, and poor visibility expected.'; }
+
+  document.getElementById('predIco').className = 'pred-ico ' + cls;
+  document.getElementById('predIco').textContent = icon;
+  document.getElementById('predTitle').textContent = title;
+  document.getElementById('predDesc').textContent  = desc;
+
+  // Trend bars
+  const pPct  = Math.max(0, Math.min(100, ((p1 - 970) / 80) * 100)).toFixed(1);
+  const d3Pct = Math.min(100, (Math.abs(d3) / 5) * 100).toFixed(1);
+  const d1Pct = Math.min(100, (Math.abs(d1) / 3) * 100).toFixed(1);
+  const d3C   = d3 > 0 ? 'var(--green)' : d3 < 0 ? 'var(--red)' : 'var(--amber)';
+  const d1C   = d1 > 0 ? 'var(--green)' : d1 < 0 ? 'var(--red)' : 'var(--amber)';
+
+  document.getElementById('trendBars').innerHTML =
+    bar('PRESSURE', pPct,  'var(--amber)', p1.toFixed(1)+' hPa', 'var(--amber)') +
+    bar('3H TREND', d3Pct, d3C, (d3>=0?'+':'')+d3.toFixed(1)+' hPa', d3C) +
+    bar('1H TREND', d1Pct, d1C, (d1>=0?'+':'')+d1.toFixed(1)+' hPa', d1C);
+
+  if (owmCur) {
+    document.getElementById('owmXtra').style.display = 'block';
+    const wind = owmCur.wind?.speed ? (owmCur.wind.speed * 3.6).toFixed(1) + ' km/h' : '—';
+    const vis  = owmCur.visibility  ? (owmCur.visibility / 1000).toFixed(1) + ' km'  : '—';
+    document.getElementById('owmGrid').innerHTML = `
+      <div class="owm-stat"><span class="osv">${owmCur.main.feels_like?.toFixed(1) ?? '—'}°</span><span class="osl">Feels Like</span></div>
+      <div class="owm-stat"><span class="osv">${owmCur.main.humidity}%</span><span class="osl">Humidity</span></div>
+      <div class="owm-stat"><span class="osv">${wind}</span><span class="osl">Wind</span></div>
+      <div class="owm-stat"><span class="osv">${vis}</span><span class="osl">Visibility</span></div>
+      <div class="owm-stat"><span class="osv">${owmCur.clouds?.all ?? '—'}%</span><span class="osl">Clouds</span></div>
+      <div class="owm-stat"><span class="osv">${wxIco(owmCur.weather[0]?.id)}</span><span class="osl">${(owmCur.weather[0]?.main||'—').toUpperCase()}</span></div>`;
+  }
+}
+
+function bar(lbl, pct, fill, val, valC) {
+  return `<div class="tbar">
+    <div class="tbl">${lbl}</div>
+    <div class="tbt"><div class="tbf" style="width:${pct}%;background:${fill}"></div></div>
+    <div class="tbv" style="color:${valC}">${val}</div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════
+//  RENDER — FORECAST
+// ══════════════════════════════════════════════════
+function renderForecast() {
+  if (!owmFc) return;
+
+  document.getElementById('fcHead').textContent =
+    `5-DAY FORECAST — ${owmFc.city.name.toUpperCase()}, ${owmFc.city.country}`;
+
+  const days = {};
+  for (const item of owmFc.list) {
+    const d = new Date(item.dt * 1000);
+    const k = d.toLocaleDateString();
+    if (!days[k]) days[k] = { items: [], date: d };
+    days[k].items.push(item);
+  }
+
+  const strip = document.getElementById('fcStrip');
+  strip.innerHTML = '';
+
+  Object.keys(days).slice(0, 5).forEach(k => {
+    const { items, date } = days[k];
+    const temps = items.map(i => i.main.temp);
+    const hi  = Math.max(...temps).toFixed(0);
+    const lo  = Math.min(...temps).toFixed(0);
+    const mid = items.find(i => { const h = new Date(i.dt*1000).getHours(); return h>=11&&h<=14; })
+             || items[Math.floor(items.length / 2)];
+    const ico  = wxIco(mid.weather[0]?.id);
+    const desc = mid.weather[0]?.description || '';
+    const rain = mid.pop ? (mid.pop * 100).toFixed(0) + '%' : '';
+    const day  = date.toLocaleDateString([], { weekday: 'short' }).toUpperCase();
+
+    strip.innerHTML += `
+      <div class="fc-item">
+        <div class="fc-day">${day}</div>
+        <div class="fc-ico">${ico}</div>
+        <div style="display:flex;justify-content:center;gap:6px;margin-bottom:4px">
+          <span class="fc-hi">${hi}°</span>
+          <span class="fc-lo">${lo}°</span>
+        </div>
+        ${rain ? `<div class="fc-rain">💧 ${rain}</div>` : ''}
+        <div class="fc-desc">${desc}</div>
+      </div>`;
+  });
+}
+
+function wxIco(id, night = false) {
+  if (!id)      return '🌤';
+  if (id < 300) return '⛈';
+  if (id < 400) return '🌦';
+  if (id < 511) return '🌧';
+  if (id===511) return '🌨';
+  if (id < 600) return '🌧';
+  if (id < 700) return '❄';
+  if (id < 800) return '🌫';
+  if (id===800) return night ? '🌙' : '☀';
+  if (id===801) return '🌤';
+  if (id===802) return '⛅';
+  return '☁';
+}
+
+// ══════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════
+function dot(id, state)  { document.getElementById(id).className = 'dot ' + state; }
+function showErr(msg)    { const b=document.getElementById('errBar'); b.style.display='flex'; document.getElementById('errTxt').textContent=msg; }
+function clearErr()      { document.getElementById('errBar').style.display='none'; }
+
+// ══════════════════════════════════════════════════
+//  MAIN REFRESH LOOP
+// ══════════════════════════════════════════════════
+async function refreshAll() {
+  clearErr();
+  const btn = document.getElementById('btnRef');
+  btn.disabled = true; btn.textContent = '↻ …';
+
+  await Promise.all([fetchSheet(), fetchOWM()]);
+
+  renderLive();
+  renderSparks();
+  renderMainChart();
+  renderComparison();
+  renderPrediction();
+  renderForecast();
+
+  const now = new Date();
+  document.getElementById('syncTxt').textContent =
+    'Synced ' + now.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+
+  btn.disabled = false; btn.textContent = '↻ REFRESH';
+}
+
+// ══════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  refreshAll();
+  setInterval(refreshAll, AUTO_REFRESH_MS);
+});
+</script>
+</body>
+</html>
