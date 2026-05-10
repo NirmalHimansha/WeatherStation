@@ -1,29 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Weather Monitor Dashboard</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AtomoStation</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap');
-
+  /* ── Design tokens ─────────────────────────────────────────────── */
   :root {
-    --bg:        #0d0f14;
-    --bg2:       #13161e;
-    --bg3:       #1c2030;
-    --border:    rgba(255,255,255,0.07);
-    --border2:   rgba(255,255,255,0.13);
-    --text:      #e8eaf2;
-    --muted:     #6b7280;
-    --accent1:   #5ee7c8;   /* teal */
-    --accent2:   #f87c7c;   /* coral */
-    --accent3:   #fbbf24;   /* amber */
-    --accent4:   #818cf8;   /* violet */
-    --accent5:   #34d399;   /* green */
-    --font-head: 'Syne', sans-serif;
-    --font-mono: 'DM Mono', monospace;
+    --bg:        #080c10;
+    --surface:   #0e1318;
+    --border:    #1c2530;
+    --accent-t:  #00d4ff;   /* temperature – cyan   */
+    --accent-h:  #00ff9d;   /* humidity    – mint   */
+    --accent-l:  #ffb830;   /* light       – amber  */
+    --accent-hi: #ff5f87;   /* heat index  – coral  */
+    --text:      #e8edf2;
+    --muted:     #4a5568;
+    --card-glow: rgba(0,212,255,0.06);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,779 +26,536 @@
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: var(--font-mono);
+    font-family: 'JetBrains Mono', monospace;
     min-height: 100vh;
-    padding: 0;
+    overflow-x: hidden;
   }
 
-  /* ── Header ─────────────────────────────────────────── */
+  /* ── Animated background grid ──────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridDrift 20s linear infinite;
+    pointer-events: none; z-index: 0;
+  }
+  @keyframes gridDrift {
+    from { background-position: 0 0; }
+    to   { background-position: 40px 40px; }
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────── */
+  .wrapper { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  /* ── Header ────────────────────────────────────────────────────── */
   header {
-    border-bottom: 1px solid var(--border);
-    padding: 1.5rem 2.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    position: sticky;
-    top: 0;
-    background: var(--bg);
-    z-index: 100;
-    backdrop-filter: blur(10px);
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 3rem; flex-wrap: wrap; gap: 1rem;
   }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+  .header-left h1 {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800; font-size: clamp(1.6rem, 4vw, 2.4rem);
+    letter-spacing: -0.03em; line-height: 1;
+    background: linear-gradient(135deg, var(--accent-t), var(--accent-h));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   }
-
-  .logo-icon {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, var(--accent1), var(--accent4));
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px;
+  .header-left p {
+    font-size: 0.72rem; color: var(--muted); margin-top: 0.4rem; letter-spacing: 0.12em; text-transform: uppercase;
   }
-
-  .logo h1 {
-    font-family: var(--font-head);
-    font-size: 1.1rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+  .header-right { display: flex; align-items: center; gap: 1rem; }
+  .refresh-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--accent-t); font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem; padding: 0.5rem 1rem; cursor: pointer;
+    border-radius: 4px; letter-spacing: 0.08em; text-transform: uppercase;
+    transition: all 0.2s;
   }
-
-  .logo span { color: var(--accent1); }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 1.25rem;
+  .refresh-btn:hover { background: rgba(0,212,255,0.08); border-color: var(--accent-t); }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--accent-h);
+    box-shadow: 0 0 8px var(--accent-h);
+    animation: pulse 2s ease-in-out infinite;
   }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+  #last-updated { font-size: 0.68rem; color: var(--muted); }
 
-  .status-pill {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.72rem;
-    color: var(--muted);
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    padding: 0.35rem 0.85rem;
-    border-radius: 100px;
-  }
-
-  .dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: var(--accent5);
-    animation: pulse 2s infinite;
-  }
-
-  .dot.offline { background: var(--accent2); animation: none; }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.3; }
-  }
-
-  /* ── Config Banner ───────────────────────────────────── */
-  #config-banner {
-    background: var(--bg3);
-    border-bottom: 1px solid var(--border);
-    padding: 1.25rem 2.5rem;
-  }
-
-  #config-banner h2 {
-    font-family: var(--font-head);
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--muted);
-    margin-bottom: 0.75rem;
-  }
-
-  .config-row {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    flex-wrap: wrap;
-  }
-
-  .config-row input {
-    flex: 1;
-    min-width: 280px;
-    background: var(--bg2);
-    border: 1px solid var(--border2);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 0.82rem;
-    padding: 0.6rem 1rem;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  .config-row input:focus { border-color: var(--accent1); }
-
-  .config-row input::placeholder { color: var(--muted); }
-
-  button {
-    background: var(--accent1);
-    color: #0d0f14;
-    border: none;
-    border-radius: 8px;
-    font-family: var(--font-mono);
-    font-size: 0.82rem;
-    font-weight: 500;
-    padding: 0.6rem 1.5rem;
-    cursor: pointer;
-    transition: opacity 0.2s, transform 0.1s;
-    white-space: nowrap;
-  }
-
-  button:hover { opacity: 0.88; }
-  button:active { transform: scale(0.97); }
-
-  .help-text {
-    font-size: 0.72rem;
-    color: var(--muted);
-    margin-top: 0.5rem;
-  }
-
-  .help-text a { color: var(--accent4); text-decoration: none; }
-
-  /* ── Main Layout ─────────────────────────────────────── */
-  main {
-    padding: 2rem 2.5rem;
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-
-  /* ── Latest Reading Cards ────────────────────────────── */
-  .cards-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-  }
+  /* ── Stat cards ─────────────────────────────────────────────────── */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
 
   .card {
-    background: var(--bg2);
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 1.25rem 1.25rem 1rem;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.2s;
+    border-radius: 10px;
+    padding: 1.5rem 1.5rem 1.25rem;
+    position: relative; overflow: hidden;
+    animation: fadeUp 0.5s ease both;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.4); }
+
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--c, var(--accent-t));
+  }
+  .card::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at top left, rgba(var(--crgb,0,212,255),0.06), transparent 60%);
+    pointer-events: none;
   }
 
-  .card:hover { border-color: var(--border2); }
-
-  .card-accent {
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    border-radius: 14px 14px 0 0;
-  }
+  .card[data-type="temp"]  { --c: var(--accent-t); --crgb: 0,212,255; }
+  .card[data-type="hum"]   { --c: var(--accent-h); --crgb: 0,255,157; }
+  .card[data-type="ldr"]   { --c: var(--accent-l); --crgb: 255,184,48; }
+  .card[data-type="hi"]    { --c: var(--accent-hi); --crgb: 255,95,135; }
 
   .card-label {
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--muted);
-    margin-bottom: 0.6rem;
+    font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em;
+    color: var(--muted); margin-bottom: 0.75rem;
   }
-
   .card-value {
-    font-family: var(--font-head);
-    font-size: 1.9rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.02em;
+    font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: clamp(2rem, 4vw, 2.6rem); line-height: 1;
+    color: var(--c, var(--accent-t));
+  }
+  .card-unit { font-size: 1rem; font-weight: 400; margin-left: 0.2rem; }
+  .card-sub  { font-size: 0.7rem; color: var(--muted); margin-top: 0.5rem; }
+
+  /* ── Gauge bar ─────────────────────────────────────────────────── */
+  .gauge {
+    margin-top: 1rem; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden;
+  }
+  .gauge-fill {
+    height: 100%; border-radius: 2px;
+    background: var(--c, var(--accent-t));
+    transition: width 1s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: 0 0 8px var(--c, var(--accent-t));
   }
 
-  .card-unit {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin-top: 0.35rem;
-  }
+  /* ── Chart panels ──────────────────────────────────────────────── */
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  @media (max-width: 700px) { .charts { grid-template-columns: 1fr; } }
 
-  .card-mini {
-    font-size: 0.7rem;
-    color: var(--muted);
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--border);
+  .chart-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.5rem;
+    animation: fadeUp 0.6s ease both;
   }
-
-  /* ── Section Header ──────────────────────────────────── */
-  .section-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    margin-top: 2rem;
-  }
-
-  .section-header h2 {
-    font-family: var(--font-head);
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--muted);
-  }
-
-  .section-divider {
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-
-  /* ── Chart Cards ─────────────────────────────────────── */
-  .charts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
-    gap: 1.25rem;
-  }
-
-  .chart-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 1.5rem;
-  }
-
-  .chart-card.wide {
-    grid-column: 1 / -1;
-  }
-
   .chart-title {
-    font-family: var(--font-head);
-    font-size: 0.9rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
+    font-family: 'Syne', sans-serif; font-size: 0.85rem; font-weight: 600;
+    margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;
+  }
+  .chart-title .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c, var(--accent-t)); }
+  .chart-wrap { position: relative; height: 180px; }
+
+  .chart-panel.full { grid-column: 1 / -1; }
+  .chart-panel.full .chart-wrap { height: 220px; }
+
+  /* ── LDR label badge ───────────────────────────────────────────── */
+  .ldr-badge {
+    display: inline-block; padding: 0.2rem 0.6rem;
+    border: 1px solid var(--accent-l); border-radius: 20px;
+    font-size: 0.68rem; color: var(--accent-l);
+    letter-spacing: 0.08em; text-transform: uppercase;
   }
 
-  .chart-subtitle {
-    font-size: 0.7rem;
-    color: var(--muted);
-    margin-bottom: 1.25rem;
+  /* ── Loading / empty ───────────────────────────────────────────── */
+  .loading {
+    text-align: center; padding: 6rem 2rem;
+    font-size: 0.8rem; color: var(--muted);
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .loading span { animation: blink 1s step-start infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── Error banner ──────────────────────────────────────────────── */
+  .error-bar {
+    background: rgba(255,95,135,0.1); border: 1px solid rgba(255,95,135,0.3);
+    border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+    font-size: 0.75rem; color: var(--accent-hi); display: none;
   }
 
-  .chart-wrap {
-    position: relative;
-    height: 220px;
+  /* ── Edit-URL modal (gear button) ──────────────────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; backdrop-filter: blur(4px);
   }
-
-  .chart-wrap.tall { height: 280px; }
-
-  /* ── Footer / Last update ────────────────────────────── */
-  #last-updated {
-    text-align: center;
-    font-size: 0.7rem;
-    color: var(--muted);
-    padding: 2rem;
-    border-top: 1px solid var(--border);
-    margin-top: 2rem;
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 2rem; width: min(500px, 92vw);
   }
-
-  /* ── Loading / Error ─────────────────────────────────── */
-  #overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(13,15,20,0.7);
-    z-index: 200;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 1rem;
+  .modal-box h2 {
+    font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; margin-bottom: 0.3rem;
   }
-
-  #overlay.show { display: flex; }
-
-  .spinner {
-    width: 36px; height: 36px;
-    border: 2px solid var(--border2);
-    border-top-color: var(--accent1);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+  .modal-box p { font-size: 0.7rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.7; }
+  .modal-box label { font-size: 0.65rem; color: var(--muted); display: block; margin-bottom: 0.3rem; letter-spacing: 0.1em; text-transform: uppercase; }
+  .modal-box input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem; padding: 0.6rem 0.8rem; border-radius: 6px;
+    outline: none; transition: border-color 0.2s; margin-bottom: 1rem;
   }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .overlay-text { font-size: 0.8rem; color: var(--muted); }
-
-  #error-msg {
-    display: none;
-    background: rgba(248,124,124,0.1);
-    border: 1px solid rgba(248,124,124,0.3);
-    color: var(--accent2);
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-    font-size: 0.8rem;
-    margin-bottom: 1.5rem;
+  .modal-box input:focus { border-color: var(--accent-t); }
+  .modal-btns { display: flex; gap: 0.5rem; }
+  .save-btn {
+    flex: 1; background: var(--accent-t); color: var(--bg);
+    border: none; font-family: 'Syne', sans-serif; font-weight: 700;
+    font-size: 0.82rem; padding: 0.7rem; border-radius: 6px;
+    cursor: pointer; transition: opacity 0.2s;
   }
-
-  .range-controls {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
+  .save-btn:hover { opacity: 0.85; }
+  .cancel-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;
+    padding: 0.7rem 1rem; border-radius: 6px; cursor: pointer; transition: border-color 0.2s;
   }
+  .cancel-btn:hover { border-color: var(--muted); }
 
-  .range-btn {
-    background: var(--bg3);
-    color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.35rem 0.85rem;
-    font-size: 0.72rem;
-    cursor: pointer;
-    transition: all 0.15s;
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
-
-  .range-btn:hover, .range-btn.active {
-    background: var(--accent1);
-    color: #0d0f14;
-    border-color: var(--accent1);
-  }
-
-  @media (max-width: 600px) {
-    header { padding: 1rem 1.25rem; }
-    main   { padding: 1.25rem; }
-    #config-banner { padding: 1rem 1.25rem; }
-    .charts-grid { grid-template-columns: 1fr; }
-    .chart-wrap { height: 180px; }
-  }
+  .card:nth-child(1){animation-delay:.05s}
+  .card:nth-child(2){animation-delay:.10s}
+  .card:nth-child(3){animation-delay:.15s}
+  .card:nth-child(4){animation-delay:.20s}
 </style>
 </head>
 <body>
 
-<div id="overlay"><div class="spinner"></div><span class="overlay-text">Loading sensor data…</span></div>
-
-<header>
-  <div class="logo">
-    <div class="logo-icon">🌤</div>
-    <h1>Weather<span>Monitor</span></h1>
-  </div>
-  <div class="header-right">
-    <div class="status-pill">
-      <div class="dot" id="status-dot"></div>
-      <span id="status-text">Connecting…</span>
+<!-- ── Edit URL modal (opened by ⚙ button) ────────────────────── -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <h2>Update Script URL</h2>
+    <p>Paste the Google Apps Script Web App URL below. This is embedded directly in the page — no login required. Changes are saved for this browser.</p>
+    <label>Web App URL</label>
+    <input type="text" id="editUrlInput" placeholder="https://script.google.com/macros/s/.../exec"/>
+    <label>History rows to fetch</label>
+    <input type="number" id="editRowsInput" value="50" min="5" max="500" style="width:120px"/>
+    <div class="modal-btns">
+      <button class="save-btn" onclick="applyEdit()">Save & Reload</button>
+      <button class="cancel-btn" onclick="closeModal()">Cancel</button>
     </div>
   </div>
-</header>
-
-<div id="config-banner">
-  <h2>Data Source — Google Sheet</h2>
-  <div class="config-row">
-    <input type="text" id="sheet-id-input"
-      placeholder="Paste your Google Sheet ID here (e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms)"
-      value="">
-    <input type="text" id="sheet-name-input"
-      placeholder="Sheet tab name (default: WeatherData)"
-      value="WeatherData" style="max-width:220px">
-    <button onclick="loadData()">Load Data ↗</button>
-  </div>
-  <p class="help-text">
-    Sheet must be publicly accessible:
-    <a href="#" onclick="showSharingHelp()">How to share?</a>
-    &nbsp;·&nbsp; Share → Anyone with link → Viewer
-  </p>
 </div>
 
-<main>
-  <div id="error-msg"></div>
+<div class="wrapper">
+  <header>
+    <div class="header-left">
+      <h1>Atomo Station</h1>
+      <p>ESP32-WROOM-32D &nbsp;·&nbsp; DHT11 + LDR &nbsp;·&nbsp; Live</p>
+    </div>
+    <div class="header-right">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="last-updated">—</span>
+      <button class="refresh-btn" onclick="loadData()">↺ Refresh</button>
+      <button class="refresh-btn" onclick="openModal()" style="color:var(--muted)">⚙</button>
+    </div>
+  </header>
 
-  <!-- ── Latest Readings ── -->
-  <div class="section-header">
-    <h2>Latest Reading</h2>
-    <div class="section-divider"></div>
+  <div class="error-bar" id="errorBar"></div>
+
+  <div id="mainContent" style="display:none">
+    <!-- ── Stat cards ─────────────────────────────────────────── -->
+    <div class="cards">
+      <div class="card" data-type="temp">
+        <div class="card-label">Temperature</div>
+        <div class="card-value" id="valTemp">—<span class="card-unit">°C</span></div>
+        <div class="card-sub" id="subTemp">— °F</div>
+        <div class="gauge"><div class="gauge-fill" id="gaugeTemp" style="width:0%"></div></div>
+      </div>
+      <div class="card" data-type="hum">
+        <div class="card-label">Humidity</div>
+        <div class="card-value" id="valHum">—<span class="card-unit">%</span></div>
+        <div class="card-sub">Relative humidity</div>
+        <div class="gauge"><div class="gauge-fill" id="gaugeHum" style="width:0%"></div></div>
+      </div>
+      <div class="card" data-type="hi">
+        <div class="card-label">Heat Index</div>
+        <div class="card-value" id="valHI">—<span class="card-unit">°C</span></div>
+        <div class="card-sub">Feels like</div>
+        <div class="gauge"><div class="gauge-fill" id="gaugeHI" style="width:0%"></div></div>
+      </div>
+      <div class="card" data-type="ldr">
+        <div class="card-label">Light Level</div>
+        <div class="card-value" id="valLdr">—<span class="card-unit">%</span></div>
+        <div class="card-sub" id="subLdr"><span class="ldr-badge" id="badgeLdr">—</span></div>
+        <div class="gauge"><div class="gauge-fill" id="gaugeLdr" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- ── Charts ─────────────────────────────────────────────── -->
+    <div class="charts">
+      <div class="chart-panel" style="--c:var(--accent-t)">
+        <div class="chart-title"><span class="dot"></span>Temperature History</div>
+        <div class="chart-wrap"><canvas id="chartTemp"></canvas></div>
+      </div>
+      <div class="chart-panel" style="--c:var(--accent-h)">
+        <div class="chart-title"><span class="dot" style="background:var(--accent-h)"></span>Humidity History</div>
+        <div class="chart-wrap"><canvas id="chartHum"></canvas></div>
+      </div>
+      <div class="chart-panel full" style="--c:var(--accent-l)">
+        <div class="chart-title"><span class="dot" style="background:var(--accent-l)"></span>Light Level & Heat Index — Combined</div>
+        <div class="chart-wrap"><canvas id="chartCombined"></canvas></div>
+      </div>
+    </div>
   </div>
 
-  <div class="cards-grid">
-    <div class="card">
-      <div class="card-accent" style="background:var(--accent2)"></div>
-      <div class="card-label">Temperature (DHT11)</div>
-      <div class="card-value" id="v-dht-temp" style="color:var(--accent2)">—</div>
-      <div class="card-unit">degrees celsius</div>
-      <div class="card-mini" id="m-dht-temp">No data yet</div>
-    </div>
-    <div class="card">
-      <div class="card-accent" style="background:var(--accent4)"></div>
-      <div class="card-label">Humidity (DHT11)</div>
-      <div class="card-value" id="v-humidity" style="color:var(--accent4)">—</div>
-      <div class="card-unit">percent relative humidity</div>
-      <div class="card-mini" id="m-humidity">No data yet</div>
-    </div>
-    <div class="card">
-      <div class="card-accent" style="background:var(--accent1)"></div>
-      <div class="card-label">Temperature (BMP280)</div>
-      <div class="card-value" id="v-bmp-temp" style="color:var(--accent1)">—</div>
-      <div class="card-unit">degrees celsius</div>
-      <div class="card-mini" id="m-bmp-temp">No data yet</div>
-    </div>
-    <div class="card">
-      <div class="card-accent" style="background:var(--accent3)"></div>
-      <div class="card-label">Pressure (BMP280)</div>
-      <div class="card-value" id="v-pressure" style="color:var(--accent3)">—</div>
-      <div class="card-unit">hectopascals</div>
-      <div class="card-mini" id="m-pressure">No data yet</div>
-    </div>
-    <div class="card">
-      <div class="card-accent" style="background:var(--accent5)"></div>
-      <div class="card-label">Altitude (BMP280)</div>
-      <div class="card-value" id="v-altitude" style="color:var(--accent5)">—</div>
-      <div class="card-unit">metres above sea level</div>
-      <div class="card-mini" id="m-altitude">No data yet</div>
-    </div>
-    <div class="card">
-      <div class="card-accent" style="background:#c084fc"></div>
-      <div class="card-label">Light Level (LDR)</div>
-      <div class="card-value" id="v-light" style="color:#c084fc">—</div>
-      <div class="card-unit">percent brightness</div>
-      <div class="card-mini" id="m-light">No data yet</div>
-    </div>
+  <div class="loading" id="loadingMsg">
+    Awaiting data<span>...</span>
   </div>
-
-  <!-- ── Time Range ── -->
-  <div class="section-header" style="margin-top:2.5rem">
-    <h2>Historical Charts</h2>
-    <div class="section-divider"></div>
-  </div>
-
-  <div class="range-controls">
-    <button class="range-btn" onclick="setRange(12)"    id="r12">Last 12h</button>
-    <button class="range-btn active" onclick="setRange(24)" id="r24">Last 24h</button>
-    <button class="range-btn" onclick="setRange(72)"    id="r72">Last 3d</button>
-    <button class="range-btn" onclick="setRange(168)"   id="r168">Last 7d</button>
-    <button class="range-btn" onclick="setRange(0)"     id="r0">All time</button>
-  </div>
-
-  <div class="charts-grid">
-
-    <div class="chart-card wide">
-      <div class="chart-title">Temperature over time</div>
-      <div class="chart-subtitle">DHT11 vs BMP280 sensor comparison (°C)</div>
-      <div class="chart-wrap tall"><canvas id="chart-temp"></canvas></div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title">Relative Humidity</div>
-      <div class="chart-subtitle">DHT11 sensor · percent (%)</div>
-      <div class="chart-wrap"><canvas id="chart-humidity"></canvas></div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title">Atmospheric Pressure</div>
-      <div class="chart-subtitle">BMP280 sensor · hPa</div>
-      <div class="chart-wrap"><canvas id="chart-pressure"></canvas></div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title">Light Level</div>
-      <div class="chart-subtitle">LDR sensor · percent brightness</div>
-      <div class="chart-wrap"><canvas id="chart-light"></canvas></div>
-    </div>
-
-    <div class="chart-card">
-      <div class="chart-title">Altitude Estimate</div>
-      <div class="chart-subtitle">BMP280 barometric altitude · metres</div>
-      <div class="chart-wrap"><canvas id="chart-altitude"></canvas></div>
-    </div>
-
-  </div>
-</main>
-
-<div id="last-updated">No data loaded · Enter your Sheet ID above and click Load Data</div>
+</div>
 
 <script>
-// ── State ─────────────────────────────────────────────────────
-let ALL_ROWS = [];
-let rangeHours = 24;
-const charts = {};
+// ── ★ PASTE YOUR APPS SCRIPT URL HERE ★ ──────────────────────────
+var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz09pXPEJPEgS0wI95enJ8zx00iYT_ioyLO1Q9viVr6hfSIxjKNt0h2CBri0e1v4GUWVA/exec';
+var ROWS       = 50;   // number of historical readings to fetch
+// ─────────────────────────────────────────────────────────────────
+// The URL above is the default. If the user has overridden it via
+// the ⚙ modal, localStorage takes precedence.
+(function() {
+  var saved = localStorage.getItem('scriptUrl');
+  if (saved) SCRIPT_URL = saved;
+  var savedRows = localStorage.getItem('rows');
+  if (savedRows) ROWS = parseInt(savedRows);
+})();
 
-// ── Chart defaults ─────────────────────────────────────────────
-Chart.defaults.color = '#6b7280';
-Chart.defaults.font.family = "'DM Mono', monospace";
-Chart.defaults.font.size = 11;
+// ── Edit-URL modal ─────────────────────────────────────────────────
+function openModal() {
+  document.getElementById('editUrlInput').value   = SCRIPT_URL;
+  document.getElementById('editRowsInput').value  = ROWS;
+  document.getElementById('editModal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('editModal').classList.remove('open');
+}
+function applyEdit() {
+  var url  = document.getElementById('editUrlInput').value.trim();
+  var rows = parseInt(document.getElementById('editRowsInput').value) || 50;
+  if (!url) { alert('Please enter a URL.'); return; }
+  localStorage.setItem('scriptUrl', url);
+  localStorage.setItem('rows', rows);
+  SCRIPT_URL = url; ROWS = rows;
+  closeModal();
+  loadData();
+}
 
-function commonOpts(label, color, unit) {
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
+// ── Chart instances ────────────────────────────────────────────────
+var charts = {};
+
+var BASE_CHART_CFG = {
+  type: 'line',
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    animation: { duration: 600, easing: 'easeInOutQuart' },
     interaction: { mode: 'index', intersect: false },
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#1c2030',
-        borderColor: 'rgba(255,255,255,0.1)',
-        borderWidth: 1,
-        padding: 10,
-        callbacks: {
-          label: ctx => ` ${ctx.parsed.y.toFixed(1)} ${unit}`
-        }
+        backgroundColor: '#0e1318',
+        borderColor: '#1c2530', borderWidth: 1,
+        titleColor: '#4a5568', bodyColor: '#e8edf2',
+        titleFont: { family: 'JetBrains Mono', size: 10 },
+        bodyFont:  { family: 'JetBrains Mono', size: 11 },
+        padding: 10
       }
     },
     scales: {
       x: {
-        grid: { color: 'rgba(255,255,255,0.04)' },
-        ticks: {
-          maxTicksLimit: 8,
-          maxRotation: 0,
-          callback: function(val, idx) {
-            const v = this.getLabelForValue(val);
-            return v ? v.substring(11, 16) : '';
-          }
-        }
+        ticks: { color: '#4a5568', font: { family:'JetBrains Mono', size:9 }, maxRotation:45 },
+        grid:  { color: '#1c2530' }
       },
       y: {
-        grid: { color: 'rgba(255,255,255,0.04)' },
-        ticks: { callback: v => v.toFixed(1) }
+        ticks: { color: '#4a5568', font: { family:'JetBrains Mono', size:9 } },
+        grid:  { color: '#1c2530' }
       }
     }
+  }
+};
+
+function makeDataset(label, data, color, fill) {
+  return {
+    label, data,
+    borderColor: color,
+    backgroundColor: fill || 'transparent',
+    borderWidth: 2,
+    pointRadius: data.length > 30 ? 0 : 3,
+    pointHoverRadius: 5,
+    pointBackgroundColor: color,
+    tension: 0.35,
+    fill: !!fill
   };
 }
 
-function makeChart(id, label, color, unit, type='line') {
-  const ctx = document.getElementById(id).getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, 0, 220);
-  grad.addColorStop(0, color + '28');
-  grad.addColorStop(1, color + '00');
-
-  return new Chart(ctx, {
-    type: type,
-    data: {
-      labels: [],
-      datasets: [{
-        label, data: [],
-        borderColor: color,
-        backgroundColor: grad,
-        borderWidth: 1.5,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointHoverBackgroundColor: color,
-        tension: 0.35,
-        fill: true
-      }]
-    },
-    options: commonOpts(label, color, unit)
-  });
+function initChart(id, datasets, yLabel) {
+  var ctx = document.getElementById(id).getContext('2d');
+  if (charts[id]) charts[id].destroy();
+  var cfg = JSON.parse(JSON.stringify(BASE_CHART_CFG));
+  cfg.data = { labels: [], datasets: [] };
+  if (yLabel) cfg.options.scales.y.title = { display:true, text:yLabel, color:'#4a5568', font:{family:'JetBrains Mono',size:9} };
+  charts[id] = new Chart(ctx, cfg);
 }
 
-function makeDualChart(id, label1, label2, color1, color2, unit) {
-  const ctx = document.getElementById(id).getContext('2d');
-  const g1 = ctx.createLinearGradient(0, 0, 0, 280);
-  g1.addColorStop(0, color1 + '22'); g1.addColorStop(1, color1 + '00');
-
-  return new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: label1, data: [],
-          borderColor: color1, backgroundColor: g1,
-          borderWidth: 1.8, pointRadius: 0, pointHoverRadius: 4,
-          pointHoverBackgroundColor: color1,
-          tension: 0.35, fill: true
-        },
-        {
-          label: label2, data: [],
-          borderColor: color2, backgroundColor: 'transparent',
-          borderWidth: 1.5, borderDash: [4,3],
-          pointRadius: 0, pointHoverRadius: 4,
-          pointHoverBackgroundColor: color2,
-          tension: 0.35, fill: false
-        }
-      ]
-    },
-    options: {
-      ...commonOpts(label1, color1, unit),
-      plugins: {
-        ...commonOpts(label1, color1, unit).plugins,
-        legend: {
-          display: true,
-          labels: { color: '#6b7280', boxWidth: 14, font: { size: 11 } }
-        }
-      }
-    }
-  });
+function updateChart(id, labels, datasets) {
+  var c = charts[id];
+  c.data.labels = labels;
+  c.data.datasets = datasets;
+  c.update('active');
 }
 
-// ── Build charts once ──────────────────────────────────────────
-function initCharts() {
-  charts.temp     = makeDualChart('chart-temp', 'DHT11', 'BMP280', '#f87c7c', '#5ee7c8', '°C');
-  charts.humidity = makeChart('chart-humidity', 'Humidity', '#818cf8', '%');
-  charts.pressure = makeChart('chart-pressure', 'Pressure', '#fbbf24', 'hPa');
-  charts.light    = makeChart('chart-light',    'Light',    '#c084fc', '%');
-  charts.altitude = makeChart('chart-altitude', 'Altitude', '#34d399', 'm');
+// ── Format helpers ─────────────────────────────────────────────────
+function fmtTime(ts) {
+  if (!ts) return '—';
+  var d = new Date(ts);
+  if (isNaN(d)) return String(ts).slice(11,16);
+  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+function fmtNum(v, dp) { return v !== undefined && v !== null ? parseFloat(v).toFixed(dp||1) : '—'; }
+function cToF(c)        { return (c * 9/5 + 32).toFixed(1); }
+
+// ── Gauge helper ───────────────────────────────────────────────────
+function setGauge(id, pct) {
+  document.getElementById(id).style.width = Math.min(100, Math.max(0, pct)) + '%';
 }
 
-// ── Filter & render ────────────────────────────────────────────
-function renderRange() {
-  if (!ALL_ROWS.length) return;
-
-  const now = new Date();
-  const cutoff = rangeHours > 0
-    ? new Date(now - rangeHours * 3600 * 1000)
-    : new Date(0);
-
-  const rows = ALL_ROWS.filter(r => r.ts >= cutoff);
-  if (!rows.length) { showError('No data in selected time range.'); return; }
-  clearError();
-
-  const labels = rows.map(r => r.ts.toLocaleString('en-GB', {
-    month:'2-digit', day:'2-digit',
-    hour:'2-digit', minute:'2-digit', hour12: false
-  }));
-
-  function update(chart, ...cols) {
-    chart.data.labels = labels;
-    cols.forEach((col, i) => {
-      chart.data.datasets[i].data = rows.map(r => r[col]);
-    });
-    chart.update('none');
-  }
-
-  update(charts.temp,     'dht_temp', 'bmp_temp');
-  update(charts.humidity, 'humidity');
-  update(charts.pressure, 'pressure');
-  update(charts.light,    'light');
-  update(charts.altitude, 'altitude');
-
-  // Latest reading cards
-  const last = rows[rows.length - 1];
-  const prev = rows.length > 1 ? rows[rows.length - 2] : null;
-
-  function setCard(valId, miniId, val, prevVal, unit, decimals=1) {
-    document.getElementById(valId).textContent = val.toFixed(decimals);
-    if (prev) {
-      const diff = val - prevVal;
-      const sign = diff >= 0 ? '▲' : '▼';
-      document.getElementById(miniId).textContent =
-        `${sign} ${Math.abs(diff).toFixed(decimals)} ${unit} from prev`;
-    } else {
-      document.getElementById(miniId).textContent = `Only 1 reading`;
-    }
-  }
-
-  setCard('v-dht-temp', 'm-dht-temp', last.dht_temp, prev?.dht_temp ?? last.dht_temp, '°C');
-  setCard('v-humidity', 'm-humidity', last.humidity, prev?.humidity ?? last.humidity, '%');
-  setCard('v-bmp-temp', 'm-bmp-temp', last.bmp_temp, prev?.bmp_temp ?? last.bmp_temp, '°C');
-  setCard('v-pressure', 'm-pressure', last.pressure, prev?.pressure ?? last.pressure, 'hPa', 1);
-  setCard('v-altitude', 'm-altitude', last.altitude, prev?.altitude ?? last.altitude, 'm');
-  setCard('v-light',    'm-light',    last.light,    prev?.light    ?? last.light,    '%');
-
-  document.getElementById('last-updated').textContent =
-    `Last updated: ${last.ts.toLocaleString()} · ${rows.length} readings in view · refreshes on page reload`;
-
-  setStatus(true, `Live · ${ALL_ROWS.length} total records`);
+// ── Data loading ───────────────────────────────────────────────────
+function showError(msg) {
+  var bar = document.getElementById('errorBar');
+  bar.textContent = '⚠  ' + msg;
+  bar.style.display = 'block';
 }
+function clearError() { document.getElementById('errorBar').style.display = 'none'; }
 
-// ── Load from Google Sheets CSV ─────────────────────────────────
 async function loadData() {
-  const id   = document.getElementById('sheet-id-input').value.trim();
-  const name = document.getElementById('sheet-name-input').value.trim() || 'WeatherData';
-
-  if (!id) { showError('Please enter your Google Sheet ID.'); return; }
-
+  if (!SCRIPT_URL) return;
   clearError();
-  showOverlay(true);
-  setStatus(false, 'Loading…');
-
-  // Google Sheets CSV export URL (public sheets only)
-  const url = `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
+  document.getElementById('statusDot').style.background = 'var(--muted)';
 
   try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    parseCSV(text);
-    renderRange();
-  } catch (err) {
-    showError(`Could not load data: ${err.message}. Make sure the sheet is shared publicly (Anyone with link → Viewer).`);
-    setStatus(false, 'Error');
-  } finally {
-    showOverlay(false);
+    var res  = await fetch(SCRIPT_URL + '?rows=' + ROWS);
+    var json = await res.json();
+
+    if (json.status !== 'ok' || !json.data || !json.data.length) {
+      showError('No data returned from Google Sheets yet. Make sure your ESP32 has posted at least one reading.');
+      return;
+    }
+
+    var rows = json.data;
+    renderCards(rows[rows.length - 1]);
+    renderCharts(rows);
+
+    document.getElementById('loadingMsg').style.display    = 'none';
+    document.getElementById('mainContent').style.display  = 'block';
+    document.getElementById('statusDot').style.background = 'var(--accent-h)';
+    document.getElementById('last-updated').textContent   =
+      'Updated ' + new Date().toLocaleTimeString();
+
+  } catch(e) {
+    showError('Failed to fetch data: ' + e.message + '. Check your Apps Script URL and CORS settings.');
+    document.getElementById('statusDot').style.background = 'var(--accent-hi)';
   }
 }
 
-function parseCSV(text) {
-  const lines = text.trim().split('\n').map(l =>
-    l.split(',').map(c => c.replace(/^"|"$/g, '').trim())
-  );
+function renderCards(latest) {
+  var t = parseFloat(latest.temperature);
+  var h = parseFloat(latest.humidity);
+  var hi= parseFloat(latest.heatIndex);
+  var l = parseFloat(latest.ldrPct);
 
-  // lines[0] = headers, rest = data
-  if (lines.length < 2) throw new Error('No data rows found.');
+  document.getElementById('valTemp').innerHTML = fmtNum(t) + '<span class="card-unit">°C</span>';
+  document.getElementById('subTemp').textContent = cToF(t) + ' °F';
+  setGauge('gaugeTemp', ((t + 10) / 70) * 100);   // scale -10..60°C
 
-  // Expected columns (0-indexed):
-  // 0: Timestamp, 1: DHT11 Temp, 2: Humidity, 3: BMP Temp,
-  // 4: Pressure, 5: Altitude, 6: LDR Raw, 7: LDR %
+  document.getElementById('valHum').innerHTML  = fmtNum(h) + '<span class="card-unit">%</span>';
+  setGauge('gaugeHum', h);
 
-  ALL_ROWS = lines.slice(1).map(cols => {
-    const ts = new Date(cols[0]);
-    if (isNaN(ts)) return null;
-    return {
-      ts,
-      dht_temp: parseFloat(cols[1]) || 0,
-      humidity: parseFloat(cols[2]) || 0,
-      bmp_temp: parseFloat(cols[3]) || 0,
-      pressure: parseFloat(cols[4]) || 0,
-      altitude: parseFloat(cols[5]) || 0,
-      ldr_raw:  parseFloat(cols[6]) || 0,
-      light:    parseFloat(cols[7]) || 0,
-    };
-  }).filter(Boolean).sort((a, b) => a.ts - b.ts);
+  document.getElementById('valHI').innerHTML   = fmtNum(hi) + '<span class="card-unit">°C</span>';
+  setGauge('gaugeHI', ((hi + 10) / 70) * 100);
+
+  document.getElementById('valLdr').innerHTML  = fmtNum(l) + '<span class="card-unit">%</span>';
+  document.getElementById('badgeLdr').textContent = latest.ldrLabel || '—';
+  setGauge('gaugeLdr', l);
 }
 
-// ── Range selector ──────────────────────────────────────────────
-function setRange(hours) {
-  rangeHours = hours;
-  document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('r' + hours)?.classList.add('active');
-  renderRange();
+function renderCharts(rows) {
+  var labels = rows.map(r => fmtTime(r.timestamp));
+  var temps  = rows.map(r => parseFloat(r.temperature));
+  var hums   = rows.map(r => parseFloat(r.humidity));
+  var his    = rows.map(r => parseFloat(r.heatIndex));
+  var ldrs   = rows.map(r => parseFloat(r.ldrPct));
+
+  // Gradient fills
+  function gradient(ctx, colorStop) {
+    var g = ctx.createLinearGradient(0, 0, 0, 180);
+    g.addColorStop(0,   colorStop.replace('1)', '0.25)'));
+    g.addColorStop(1,   colorStop.replace('1)', '0)'));
+    return g;
+  }
+
+  // Temperature chart
+  var ctxT = document.getElementById('chartTemp').getContext('2d');
+  var fillT = ctxT.createLinearGradient(0,0,0,180);
+  fillT.addColorStop(0,'rgba(0,212,255,0.18)'); fillT.addColorStop(1,'rgba(0,212,255,0)');
+  if (charts.chartTemp) charts.chartTemp.destroy();
+  charts.chartTemp = new Chart(ctxT, {
+    type: 'line',
+    data: { labels, datasets: [makeDataset('°C', temps, '#00d4ff', fillT)] },
+    options: JSON.parse(JSON.stringify(BASE_CHART_CFG.options))
+  });
+
+  // Humidity chart
+  var ctxH = document.getElementById('chartHum').getContext('2d');
+  var fillH = ctxH.createLinearGradient(0,0,0,180);
+  fillH.addColorStop(0,'rgba(0,255,157,0.18)'); fillH.addColorStop(1,'rgba(0,255,157,0)');
+  if (charts.chartHum) charts.chartHum.destroy();
+  charts.chartHum = new Chart(ctxH, {
+    type: 'line',
+    data: { labels, datasets: [makeDataset('%', hums, '#00ff9d', fillH)] },
+    options: JSON.parse(JSON.stringify(BASE_CHART_CFG.options))
+  });
+
+  // Combined chart (LDR + Heat Index, dual Y)
+  var ctxC = document.getElementById('chartCombined').getContext('2d');
+  var fillL = ctxC.createLinearGradient(0,0,0,220);
+  fillL.addColorStop(0,'rgba(255,184,48,0.15)'); fillL.addColorStop(1,'rgba(255,184,48,0)');
+  if (charts.chartCombined) charts.chartCombined.destroy();
+  var combOpts = JSON.parse(JSON.stringify(BASE_CHART_CFG.options));
+  combOpts.scales.y = {
+    type:'linear', position:'left',
+    ticks:{ color:'#ffb830', font:{family:'JetBrains Mono',size:9} },
+    grid:{ color:'#1c2530' },
+    title:{ display:true, text:'Light %', color:'#ffb830', font:{family:'JetBrains Mono',size:9} }
+  };
+  combOpts.scales.y1 = {
+    type:'linear', position:'right',
+    ticks:{ color:'#ff5f87', font:{family:'JetBrains Mono',size:9} },
+    grid:{ drawOnChartArea:false },
+    title:{ display:true, text:'Heat Idx °C', color:'#ff5f87', font:{family:'JetBrains Mono',size:9} }
+  };
+  combOpts.plugins.legend = {
+    display:true,
+    labels:{ color:'#4a5568', font:{family:'JetBrains Mono',size:9}, boxWidth:10 }
+  };
+  charts.chartCombined = new Chart(ctxC, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        Object.assign(makeDataset('Light (%)', ldrs, '#ffb830', fillL), { yAxisID:'y' }),
+        Object.assign(makeDataset('Heat Idx (°C)', his, '#ff5f87'), { yAxisID:'y1' })
+      ]
+    },
+    options: combOpts
+  });
 }
 
-// ── Helpers ─────────────────────────────────────────────────────
-function showOverlay(show) {
-  document.getElementById('overlay').classList.toggle('show', show);
-}
-
-function showError(msg) {
-  const el = document.getElementById('error-msg');
-  el.textContent = msg;
-  el.style.display = 'block';
-}
-
-function clearError() {
-  document.getElementById('error-msg').style.display = 'none';
-}
-
-function setStatus(online, text) {
-  document.getElementById('status-dot').className = 'dot' + (online ? '' : ' offline');
-  document.getElementById('status-text').textContent = text;
-}
-
-function showSharingHelp() {
-  alert('To share your Google Sheet:\n1. Open the sheet\n2. Click "Share" (top-right)\n3. Under "General access", choose "Anyone with the link"\n4. Set role to "Viewer"\n5. Copy the link and extract the Sheet ID from the URL:\nhttps://docs.google.com/spreadsheets/d/[SHEET_ID]/edit');
-}
-
-// ── Init ─────────────────────────────────────────────────────────
-initCharts();
-setStatus(false, 'Awaiting data');
-
-// Auto-load if Sheet ID is pre-filled
-const savedId = localStorage.getItem('wx_sheet_id');
-if (savedId) {
-  document.getElementById('sheet-id-input').value = savedId;
-}
-
-document.getElementById('sheet-id-input').addEventListener('change', () => {
-  localStorage.setItem('wx_sheet_id', document.getElementById('sheet-id-input').value.trim());
-});
+// ── Boot ───────────────────────────────────────────────────────────
+loadData();
+setInterval(loadData, 60000);   // auto-refresh every minute
 </script>
 </body>
 </html>
